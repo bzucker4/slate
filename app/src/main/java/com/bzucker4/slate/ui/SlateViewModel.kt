@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.bzucker4.slate.audio.SlateAudio
 import com.bzucker4.slate.data.LockoutSnapshot
 import com.bzucker4.slate.data.LockoutStore
+import com.bzucker4.slate.haptics.SlateHaptics
 import com.bzucker4.slate.lockout.DurationOption
 import com.bzucker4.slate.lockout.LockoutDurations
 import kotlinx.coroutines.delay
@@ -31,6 +32,7 @@ data class SlateUiState(
 class SlateViewModel(application: Application) : AndroidViewModel(application) {
     private val store = LockoutStore(application)
     private val audio = SlateAudio(application)
+    private val haptics = SlateHaptics(application)
     private val nowEpochMs = MutableStateFlow(System.currentTimeMillis())
     private val selectedOptionOverride = MutableStateFlow<DurationOption?>(null)
     private val scratching = MutableStateFlow(false)
@@ -77,24 +79,29 @@ class SlateViewModel(application: Application) : AndroidViewModel(application) {
         scratching.value = true
     }
 
-    fun onScrubMove(speedPxPerMs: Float) {
+    fun onScrubMove(speedPxPerMs: Float, distancePx: Float) {
         audio.startOrUpdateScrub(speedPxPerMs)
+        haptics.grit(speedPxPerMs, distancePx)
     }
 
     fun onScrubStop() {
         audio.stopScrub()
+        haptics.stopGrit()
     }
 
-    /**
-     * Short sub-bass hit. Call when frost dissolve finishes.
-     * Dissolve is not implemented yet; this is the hook for that chunk.
-     */
+    fun onDissolveStart() {
+        audio.stopScrub()
+        haptics.stopGrit()
+        haptics.thunk()
+    }
+
     fun playCompletionChime() {
         audio.playCompletionChime()
+        haptics.completion()
     }
 
     fun onScratchCleared() {
-        audio.stopScrub()
+        playCompletionChime()
         val option = uiState.value.selectedOption
         viewModelScope.launch {
             store.beginLockout(
@@ -107,6 +114,7 @@ class SlateViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         audio.release()
+        haptics.release()
         super.onCleared()
     }
 }

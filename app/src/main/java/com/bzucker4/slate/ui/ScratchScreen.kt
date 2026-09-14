@@ -1,5 +1,8 @@
 package com.bzucker4.slate.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -11,6 +14,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,12 +29,14 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bzucker4.slate.scratch.Scratch
 import com.bzucker4.slate.scratch.ScratchLayer
+import kotlinx.coroutines.launch
 
 @Composable
 fun ScratchScreen(
     onCleared: () -> Unit,
-    onScrubMove: (speedPxPerMs: Float) -> Unit,
+    onScrubMove: (speedPxPerMs: Float, distancePx: Float) -> Unit,
     onScrubStop: () -> Unit,
+    onDissolveStart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -44,7 +51,28 @@ fun ScratchScreen(
             ScratchLayer(canvasSize.width, canvasSize.height)
         }
     }
-    val finished = remember(layer) { mutableStateOf(false) }
+    val dissolving = remember(layer) { mutableStateOf(false) }
+    val dissolve = remember(layer) { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val onClearedState = rememberUpdatedState(onCleared)
+    val onDissolveStartState = rememberUpdatedState(onDissolveStart)
+    val onScrubStopState = rememberUpdatedState(onScrubStop)
+    val frostPaint = remember { android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG) }
+
+    fun beginDissolve() {
+        if (dissolving.value) return
+        dissolving.value = true
+        onScrubStopState.value()
+        onDissolveStartState.value()
+        scope.launch {
+            dissolve.snapTo(0f)
+            dissolve.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 620, easing = FastOutSlowInEasing),
+            )
+            onClearedState.value()
+        }
+    }
 
     DisposableEffect(layer) {
         onDispose { layer?.recycle() }
@@ -58,31 +86,39 @@ fun ScratchScreen(
             .fillMaxSize()
             .background(Color.Black)
             .onSizeChanged { canvasSize = it }
-            .pointerInput(layer, minRadiusPx, maxRadiusPx, onCleared, onScrubMove, onScrubStop) {
+            .pointerInput(layer, minRadiusPx, maxRadiusPx, onScrubMove, onScrubStop) {
                 val scratch = layer ?: return@pointerInput
                 awaitEachGesture {
+                    if (dissolving.value) return@awaitEachGesture
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var last = down.position
                     var lastTime = down.uptimeMillis
                     var lastRadius = maxRadiusPx
                     scratch.stampCircle(last.x, last.y, lastRadius)
+                    if (scratch.clearedRatio >= Scratch.CLEAR_THRESHOLD) {
+                        beginDissolve()
+                    }
                     revision++
                     down.consume()
                     try {
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.first()
-                            val cancelled = change.pressed.not()
-                            if (cancelled) {
+                            if (!change.pressed) {
                                 onScrubStop()
-                                if (!finished.value && scratch.clearedRatio >= Scratch.CLEAR_THRESHOLD) {
-                                    finished.value = true
-                                    onCleared()
+                                if (scratch.clearedRatio >= Scratch.CLEAR_THRESHOLD) {
+                                    beginDissolve()
                                 }
                                 break
                             }
+                            if (dissolving.value) {
+                                onScrubStop()
+                                change.consume()
+                                continue
+                            }
                             val dt = (change.uptimeMillis - lastTime).coerceAtLeast(1L).toFloat()
-                            val speed = Scratch.distance(last.x, last.y, change.position.x, change.position.y) / dt
+                            val distance = Scratch.distance(last.x, last.y, change.position.x, change.position.y)
+                            val speed = distance / dt
                             val radius = Scratch.brushRadiusPx(
                                 speedPxPerMs = speed,
                                 minRadiusPx = minRadiusPx,
@@ -96,11 +132,14 @@ fun ScratchScreen(
                                 radiusStart = lastRadius,
                                 radiusEnd = radius,
                             )
-                            onScrubMove(speed)
+                            onScrubMove(speed, distance)
                             last = change.position
                             lastTime = change.uptimeMillis
                             lastRadius = radius
                             revision++
+                            if (scratch.clearedRatio >= Scratch.CLEAR_THRESHOLD) {
+                                beginDissolve()
+                            }
                             change.consume()
                         }
                     } finally {
@@ -110,10 +149,12 @@ fun ScratchScreen(
             },
     ) {
         revision
+        dissolve.value
         val scratch = layer ?: return@Canvas
         if (scratch.bitmap.isRecycled) return@Canvas
+        frostPaint.alpha = ((1f - dissolve.value).coerceIn(0f, 1f) * 255f).toInt()
         drawIntoCanvas { canvas ->
-            canvas.nativeCanvas.drawBitmap(scratch.bitmap, 0f, 0f, null)
+            canvas.nativeCanvas.drawBitmap(scratch.bitmap, 0f, 0f, frostPaint)
         }
     }
 }
@@ -121,5 +162,10 @@ fun ScratchScreen(
 @Preview
 @Composable
 private fun ScratchScreenPreview() {
-    ScratchScreen(onCleared = {}, onScrubMove = {}, onScrubStop = {})
+    ScratchScreen(
+        onCleared = {},
+        onScrubMove = { _, _ -> },
+        onScrubStop = {},
+        onDissolveStart = {},
+    )
 }

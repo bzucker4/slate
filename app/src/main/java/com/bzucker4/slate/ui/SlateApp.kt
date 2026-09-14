@@ -35,6 +35,7 @@ fun SlateApp(
                         onCleared = viewModel::onScratchCleared,
                         onScrubMove = viewModel::onScrubMove,
                         onScrubStop = viewModel::onScrubStop,
+                        onDissolveStart = viewModel::onDissolveStart,
                     )
                 }
                 else -> {
