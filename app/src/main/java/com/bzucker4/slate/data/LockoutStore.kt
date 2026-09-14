@@ -17,6 +17,8 @@ data class LockoutSnapshot(
     val isLockedOut: Boolean = false,
     val lockoutEndsAtEpochMs: Long = 0L,
     val selectedDurationMs: Long = LockoutDurations.TWO_HOURS_MS,
+    val humEnabled: Boolean = true,
+    val tipDismissed: Boolean = false,
 ) {
     fun isActive(nowEpochMs: Long): Boolean =
         isLockedOut && nowEpochMs < lockoutEndsAtEpochMs
@@ -31,6 +33,8 @@ class LockoutStore(context: Context) {
             lockoutEndsAtEpochMs = prefs[Keys.LOCKOUT_ENDS_AT_EPOCH_MS] ?: 0L,
             selectedDurationMs = prefs[Keys.SELECTED_DURATION_MS]
                 ?: LockoutDurations.TWO_HOURS_MS,
+            humEnabled = prefs[Keys.HUM_ENABLED] ?: true,
+            tipDismissed = prefs[Keys.TIP_DISMISSED] ?: false,
         )
     }
 
@@ -52,6 +56,25 @@ class LockoutStore(context: Context) {
         }
     }
 
+    suspend fun setHumEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.HUM_ENABLED] = enabled
+        }
+    }
+
+    suspend fun dismissTip() {
+        dataStore.edit { prefs ->
+            prefs[Keys.TIP_DISMISSED] = true
+        }
+    }
+
+    suspend fun clearLockout() {
+        dataStore.edit { prefs ->
+            prefs[Keys.IS_LOCKED_OUT] = false
+            prefs[Keys.LOCKOUT_ENDS_AT_EPOCH_MS] = 0L
+        }
+    }
+
     suspend fun clearExpiredLockout(nowEpochMs: Long = System.currentTimeMillis()) {
         dataStore.edit { prefs ->
             val locked = prefs[Keys.IS_LOCKED_OUT] ?: false
@@ -66,5 +89,7 @@ class LockoutStore(context: Context) {
         val IS_LOCKED_OUT = booleanPreferencesKey("isLockedOut")
         val LOCKOUT_ENDS_AT_EPOCH_MS = longPreferencesKey("lockoutEndsAtEpochMs")
         val SELECTED_DURATION_MS = longPreferencesKey("selectedDurationMs")
+        val HUM_ENABLED = booleanPreferencesKey("humEnabled")
+        val TIP_DISMISSED = booleanPreferencesKey("tipDismissed")
     }
 }

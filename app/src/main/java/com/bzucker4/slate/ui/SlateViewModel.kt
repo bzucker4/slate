@@ -27,6 +27,8 @@ data class SlateUiState(
     val isLockedOutActive: Boolean get() = snapshot.isActive(nowEpochMs)
     val remainingMs: Long
         get() = (snapshot.lockoutEndsAtEpochMs - nowEpochMs).coerceAtLeast(0L)
+    val humEnabled: Boolean get() = snapshot.humEnabled
+    val tipDismissed: Boolean get() = snapshot.tipDismissed
 }
 
 class SlateViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,7 +55,7 @@ class SlateViewModel(application: Application) : AndroidViewModel(application) {
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.Eagerly,
         initialValue = SlateUiState(),
     )
 
@@ -73,6 +75,28 @@ class SlateViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             store.setSelectedDurationMs(option.storedSelectionMs())
         }
+    }
+
+    fun setHumEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            store.setHumEnabled(enabled)
+        }
+        if (!enabled) {
+            audio.stopHum()
+        }
+    }
+
+    fun dismissTip() {
+        viewModelScope.launch {
+            store.dismissTip()
+        }
+    }
+
+    fun emergencyExit() {
+        viewModelScope.launch {
+            store.clearLockout()
+        }
+        audio.stopHum()
     }
 
     fun begin() {
@@ -110,6 +134,22 @@ class SlateViewModel(application: Application) : AndroidViewModel(application) {
             )
             scratching.value = false
         }
+    }
+
+    fun onBlackoutStarted(humEnabled: Boolean) {
+        if (humEnabled) {
+            audio.startHum()
+        } else {
+            audio.stopHum()
+        }
+    }
+
+    fun onBlackoutStopped() {
+        audio.stopHum()
+    }
+
+    fun onPocketCovered(covered: Boolean) {
+        audio.setHumMuted(covered)
     }
 
     override fun onCleared() {

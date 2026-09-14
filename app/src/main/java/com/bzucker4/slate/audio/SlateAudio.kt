@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 class SlateAudio(context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val pool: SoundPool = SoundPool.Builder()
-        .setMaxStreams(2)
+        .setMaxStreams(3)
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_GAME)
@@ -26,20 +26,30 @@ class SlateAudio(context: Context) {
 
     private val scrubSoundId: Int
     private val chimeSoundId: Int
+    private val humSoundId: Int
     private var scrubStreamId: Int = 0
+    private var humStreamId: Int = 0
     private var idleStopJob: Job? = null
     private var released = false
     private var scrubLoaded = false
     private var chimeLoaded = false
+    private var humLoaded = false
+    private var humWanted = false
+    private var humMuted = false
 
     init {
         scrubSoundId = pool.load(context, R.raw.scrub, 1)
         chimeSoundId = pool.load(context, R.raw.completion_chime, 1)
+        humSoundId = pool.load(context, R.raw.hum, 1)
         pool.setOnLoadCompleteListener { _, sampleId, status ->
             if (status != 0) return@setOnLoadCompleteListener
             when (sampleId) {
                 scrubSoundId -> scrubLoaded = true
                 chimeSoundId -> chimeLoaded = true
+                humSoundId -> {
+                    humLoaded = true
+                    if (humWanted) playHum()
+                }
             }
         }
     }
@@ -72,10 +82,34 @@ class SlateAudio(context: Context) {
         }
     }
 
-    /**
-     * Short sub-bass hit. Call when frost dissolve finishes.
-     * Dissolve is not implemented yet; keep this as the completion hook.
-     */
+    fun startHum() {
+        if (released) return
+        humWanted = true
+        playHum()
+    }
+
+    fun stopHum() {
+        humWanted = false
+        if (humStreamId != 0) {
+            pool.stop(humStreamId)
+            humStreamId = 0
+        }
+    }
+
+    fun setHumMuted(muted: Boolean) {
+        humMuted = muted
+        if (humStreamId != 0) {
+            val volume = if (muted) 0f else HUM_VOLUME
+            pool.setVolume(humStreamId, volume, volume)
+        }
+    }
+
+    private fun playHum() {
+        if (released || !humLoaded || !humWanted || humStreamId != 0) return
+        val volume = if (humMuted) 0f else HUM_VOLUME
+        humStreamId = pool.play(humSoundId, volume, volume, 1, -1, 1f)
+    }
+
     fun playCompletionChime() {
         if (released || !chimeLoaded) return
         stopScrub()
@@ -85,6 +119,7 @@ class SlateAudio(context: Context) {
     fun release() {
         released = true
         stopScrub()
+        stopHum()
         scope.cancel()
         pool.release()
     }
@@ -94,6 +129,7 @@ class SlateAudio(context: Context) {
         private const val IDLE_STOP_MS = 80L
         private const val MIN_RATE = 0.55f
         private const val MAX_RATE = 1.55f
+        private const val HUM_VOLUME = 0.06f
 
         fun pitchRate(
             speedPxPerMs: Float,

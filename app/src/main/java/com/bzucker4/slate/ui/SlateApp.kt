@@ -5,6 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -16,6 +19,7 @@ fun SlateApp(
     viewModel: SlateViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showSettings by remember { mutableStateOf(false) }
     SlateTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -28,7 +32,13 @@ fun SlateApp(
             when {
                 !uiState.storeLoaded -> Unit
                 uiState.isLockedOutActive -> {
-                    BlackoutScreen(remainingMs = uiState.remainingMs)
+                    BlackoutScreen(
+                        remainingMs = uiState.remainingMs,
+                        humEnabled = uiState.humEnabled,
+                        onBlackoutStarted = viewModel::onBlackoutStarted,
+                        onBlackoutStopped = viewModel::onBlackoutStopped,
+                        onPocketCovered = viewModel::onPocketCovered,
+                    )
                 }
                 uiState.scratching -> {
                     ScratchScreen(
@@ -38,11 +48,25 @@ fun SlateApp(
                         onDissolveStart = viewModel::onDissolveStart,
                     )
                 }
+                showSettings -> {
+                    SettingsScreen(
+                        humEnabled = uiState.humEnabled,
+                        onHumEnabledChange = viewModel::setHumEnabled,
+                        onEmergencyExit = {
+                            viewModel.emergencyExit()
+                            showSettings = false
+                        },
+                        onBack = { showSettings = false },
+                    )
+                }
                 else -> {
                     HomeScreen(
                         selectedOption = uiState.selectedOption,
                         onSelectDuration = viewModel::selectDuration,
                         onBegin = viewModel::begin,
+                        showTip = !uiState.tipDismissed,
+                        onDismissTip = viewModel::dismissTip,
+                        onOpenSettings = { showSettings = true },
                     )
                 }
             }

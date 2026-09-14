@@ -7,20 +7,40 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bzucker4.slate.lockout.Lockout
+import com.bzucker4.slate.lockout.ProximityMonitor
 
 @Composable
 fun BlackoutScreen(
     remainingMs: Long,
+    humEnabled: Boolean,
+    onBlackoutStarted: (humEnabled: Boolean) -> Unit,
+    onBlackoutStopped: () -> Unit,
+    onPocketCovered: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(humEnabled) {
+        onBlackoutStarted(humEnabled)
+    }
+    DisposableEffect(Unit) {
+        val monitor = ProximityMonitor(context, onPocketCovered)
+        monitor.start()
+        onDispose {
+            monitor.stop()
+            onBlackoutStopped()
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -47,5 +67,11 @@ fun BlackoutScreen(
 @Preview
 @Composable
 private fun BlackoutScreenPreview() {
-    BlackoutScreen(remainingMs = 2 * 60 * 60 * 1000L)
+    BlackoutScreen(
+        remainingMs = 2 * 60 * 60 * 1000L,
+        humEnabled = false,
+        onBlackoutStarted = {},
+        onBlackoutStopped = {},
+        onPocketCovered = {},
+    )
 }
