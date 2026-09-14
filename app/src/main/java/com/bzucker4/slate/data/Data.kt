@@ -1,4 +1,4 @@
 package com.bzucker4.slate.data
 
-/** Placeholder for persistence and repositories. */
+/** Persistence: lockout DataStore (`LockoutStore`) and related snapshots. */
 object Data
