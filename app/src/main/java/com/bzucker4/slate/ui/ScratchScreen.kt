@@ -28,6 +28,8 @@ import com.bzucker4.slate.scratch.ScratchLayer
 @Composable
 fun ScratchScreen(
     onCleared: () -> Unit,
+    onScrubMove: (speedPxPerMs: Float) -> Unit,
+    onScrubStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -47,13 +49,16 @@ fun ScratchScreen(
     DisposableEffect(layer) {
         onDispose { layer?.recycle() }
     }
+    DisposableEffect(onScrubStop) {
+        onDispose { onScrubStop() }
+    }
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
             .onSizeChanged { canvasSize = it }
-            .pointerInput(layer, minRadiusPx, maxRadiusPx, onCleared) {
+            .pointerInput(layer, minRadiusPx, maxRadiusPx, onCleared, onScrubMove, onScrubStop) {
                 val scratch = layer ?: return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -63,36 +68,43 @@ fun ScratchScreen(
                     scratch.stampCircle(last.x, last.y, lastRadius)
                     revision++
                     down.consume()
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.first()
-                        if (!change.pressed) {
-                            if (!finished.value && scratch.clearedRatio >= Scratch.CLEAR_THRESHOLD) {
-                                finished.value = true
-                                onCleared()
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.first()
+                            val cancelled = change.pressed.not()
+                            if (cancelled) {
+                                onScrubStop()
+                                if (!finished.value && scratch.clearedRatio >= Scratch.CLEAR_THRESHOLD) {
+                                    finished.value = true
+                                    onCleared()
+                                }
+                                break
                             }
-                            break
+                            val dt = (change.uptimeMillis - lastTime).coerceAtLeast(1L).toFloat()
+                            val speed = Scratch.distance(last.x, last.y, change.position.x, change.position.y) / dt
+                            val radius = Scratch.brushRadiusPx(
+                                speedPxPerMs = speed,
+                                minRadiusPx = minRadiusPx,
+                                maxRadiusPx = maxRadiusPx,
+                            )
+                            scratch.stampSegment(
+                                x1 = last.x,
+                                y1 = last.y,
+                                x2 = change.position.x,
+                                y2 = change.position.y,
+                                radiusStart = lastRadius,
+                                radiusEnd = radius,
+                            )
+                            onScrubMove(speed)
+                            last = change.position
+                            lastTime = change.uptimeMillis
+                            lastRadius = radius
+                            revision++
+                            change.consume()
                         }
-                        val dt = (change.uptimeMillis - lastTime).coerceAtLeast(1L).toFloat()
-                        val speed = Scratch.distance(last.x, last.y, change.position.x, change.position.y) / dt
-                        val radius = Scratch.brushRadiusPx(
-                            speedPxPerMs = speed,
-                            minRadiusPx = minRadiusPx,
-                            maxRadiusPx = maxRadiusPx,
-                        )
-                        scratch.stampSegment(
-                            x1 = last.x,
-                            y1 = last.y,
-                            x2 = change.position.x,
-                            y2 = change.position.y,
-                            radiusStart = lastRadius,
-                            radiusEnd = radius,
-                        )
-                        last = change.position
-                        lastTime = change.uptimeMillis
-                        lastRadius = radius
-                        revision++
-                        change.consume()
+                    } finally {
+                        onScrubStop()
                     }
                 }
             },
@@ -109,5 +121,5 @@ fun ScratchScreen(
 @Preview
 @Composable
 private fun ScratchScreenPreview() {
-    ScratchScreen(onCleared = {})
+    ScratchScreen(onCleared = {}, onScrubMove = {}, onScrubStop = {})
 }

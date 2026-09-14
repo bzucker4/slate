@@ -31,7 +31,11 @@ fun SlateApp(
                     BlackoutScreen(remainingMs = uiState.remainingMs)
                 }
                 uiState.scratching -> {
-                    ScratchScreen(onCleared = viewModel::onScratchCleared)
+                    ScratchScreen(
+                        onCleared = viewModel::onScratchCleared,
+                        onScrubMove = viewModel::onScrubMove,
+                        onScrubStop = viewModel::onScrubStop,
+                    )
                 }
                 else -> {
                     HomeScreen(
