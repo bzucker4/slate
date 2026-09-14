@@ -20,6 +20,7 @@ data class SlateUiState(
     val nowEpochMs: Long = System.currentTimeMillis(),
     val snapshot: LockoutSnapshot = LockoutSnapshot(),
     val selectedOption: DurationOption = DurationOption.TwoHours,
+    val scratching: Boolean = false,
 ) {
     val isLockedOutActive: Boolean get() = snapshot.isActive(nowEpochMs)
     val remainingMs: Long
@@ -30,18 +31,21 @@ class SlateViewModel(application: Application) : AndroidViewModel(application) {
     private val store = LockoutStore(application)
     private val nowEpochMs = MutableStateFlow(System.currentTimeMillis())
     private val selectedOptionOverride = MutableStateFlow<DurationOption?>(null)
+    private val scratching = MutableStateFlow(false)
 
     val uiState: StateFlow<SlateUiState> = combine(
         store.snapshot,
         nowEpochMs,
         selectedOptionOverride,
-    ) { snapshot, now, override ->
+        scratching,
+    ) { snapshot, now, override, isScratching ->
         SlateUiState(
             storeLoaded = true,
             nowEpochMs = now,
             snapshot = snapshot,
             selectedOption = override
                 ?: LockoutDurations.optionForStoredDuration(snapshot.selectedDurationMs),
+            scratching = isScratching,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -68,12 +72,17 @@ class SlateViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun begin() {
+        scratching.value = true
+    }
+
+    fun onScratchCleared() {
         val option = uiState.value.selectedOption
         viewModelScope.launch {
             store.beginLockout(
                 durationMs = option.durationMs(),
                 selectedDurationMs = option.storedSelectionMs(),
             )
+            scratching.value = false
         }
     }
 }

@@ -19,7 +19,7 @@ fun SlateApp(
     SlateTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = if (uiState.isLockedOutActive) {
+            color = if (uiState.isLockedOutActive || uiState.scratching) {
                 Color.Black
             } else {
                 MaterialTheme.colorScheme.surface
@@ -29,6 +29,9 @@ fun SlateApp(
                 !uiState.storeLoaded -> Unit
                 uiState.isLockedOutActive -> {
                     BlackoutScreen(remainingMs = uiState.remainingMs)
+                }
+                uiState.scratching -> {
+                    ScratchScreen(onCleared = viewModel::onScratchCleared)
                 }
                 else -> {
                     HomeScreen(
