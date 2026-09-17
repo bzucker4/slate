@@ -1,13 +1,13 @@
 [versions]
-agp = "8.13.2"
+agp = "9.4.0"
 kotlin = "2.4.20"
-compileSdk = "36"
+compileSdk = "37"
 minSdk = "28"
-targetSdk = "36"
-coreKtx = "1.18.0"
-lifecycleRuntimeKtx = "2.10.0"
-activityCompose = "1.12.4"
-composeBom = "2026.02.01"
+targetSdk = "37"
+coreKtx = "1.19.0"
+lifecycleRuntimeKtx = "2.11.0"
+activityCompose = "1.13.0"
+composeBom = "2026.09.00"
 datastorePreferences = "1.2.1"
 
 [libraries]
