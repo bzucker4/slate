@@ -44,6 +44,18 @@ Install on a connected device:
 
 To wipe all local state: uninstall, or `adb shell pm clear com.bzucker4.slate`.
 
+## Automated emulator smoke test (optional)
+
+`.cursor/emulator-smoke-test.sh` provisions a headless Android emulator and drives the core flow end to end with `adb`: **Home → 30m → Begin → scratch the frost → Blackout**, asserting the on-screen text “The slate is clear. Lock your phone.”, then injects proximity sensor events to exercise the pocket-mute path. Screenshots are written to `/opt/cursor/artifacts` (or `build/smoke-artifacts`).
+
+```bash
+.cursor/emulator-smoke-test.sh            # provision + boot + run the flow
+.cursor/emulator-smoke-test.sh --strict   # fail (exit 3) if the emulator can't boot
+.cursor/emulator-smoke-test.sh --serial emulator-5554   # use an already-running device
+```
+
+Android x86 emulators need a KVM-accelerated guest. Some CI/Cloud VMs cannot run one — qemu starts but the guest vCPUs never execute — so by default the script detects this and **skips the on-device checks with exit 0**. Use `--strict` to treat an unavailable emulator as a failure. Run `--help` for all options and `SLATE_*` environment overrides. Emulators often lack a proximity sensor; when absent, the pocket-mute check is skipped (see **Pocket mute** above).
+
 ## Haptic OEM limits
 
 Slate picks a haptic tier at runtime:

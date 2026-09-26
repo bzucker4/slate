@@ -1,0 +1,4 @@
+{
+  "name": "Slate",
+  "install": "bash .cursor/install.sh"
+}
