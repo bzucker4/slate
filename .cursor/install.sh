@@ -7,16 +7,23 @@
 # missing, so on a prebuilt snapshot this converges quickly.
 set -euo pipefail
 
-# Pin the toolchain to what the project targets (see gradle/libs.versions.toml).
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
 CMDLINE_TOOLS_VERSION="13114758"
-SDK_PACKAGES=(
-  "platform-tools"
-  "platforms;android-36"
-  "build-tools;36.0.0"
-)
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Read compileSdk from the version catalog so this never drifts from the build.
+COMPILE_SDK="$(sed -n 's/^compileSdk *= *"\([0-9]*\)".*/\1/p' "$REPO_DIR/gradle/libs.versions.toml" | head -n1)"
+if [ -z "$COMPILE_SDK" ]; then
+  echo "Could not read compileSdk from gradle/libs.versions.toml" >&2
+  exit 1
+fi
+# Build-tools are left to the Android Gradle Plugin, which downloads the
+# version it expects (licenses are accepted below).
+SDK_PACKAGES=(
+  "platform-tools"
+  "platforms;android-${COMPILE_SDK}"
+)
 
 # Create the SDK root, using sudo only when the target is not writable.
 ensure_sdk_root() {

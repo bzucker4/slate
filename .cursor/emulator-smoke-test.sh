@@ -32,7 +32,7 @@
 # Environment overrides:
 #   ANDROID_SDK_ROOT        SDK location (default: /opt/android-sdk).
 #   SLATE_AVD_NAME          AVD name (default: slate-smoke).
-#   SLATE_SYS_IMAGE         System image (default: system-images;android-36;google_apis;x86_64).
+#   SLATE_SYS_IMAGE         System image (default: system-images;android-<compileSdk>;google_apis;x86_64).
 #   SLATE_EMU_BOOT_TIMEOUT  Max seconds to wait for boot (default: 300).
 #   SLATE_ARTIFACT_DIR      Where screenshots are written (default: /opt/cursor/artifacts,
 #                           falling back to ./build/smoke-artifacts).
@@ -45,7 +45,8 @@ set -uo pipefail
 # --------------------------- configuration ---------------------------------
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
 AVD_NAME="${SLATE_AVD_NAME:-slate-smoke}"
-SYS_IMAGE="${SLATE_SYS_IMAGE:-system-images;android-36;google_apis;x86_64}"
+CATALOG_SDK="$(sed -n 's/^compileSdk *= *"\([0-9]*\)".*/\1/p' "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/gradle/libs.versions.toml" | head -n1)"
+SYS_IMAGE="${SLATE_SYS_IMAGE:-system-images;android-${CATALOG_SDK:-37};google_apis;x86_64}"
 BOOT_TIMEOUT="${SLATE_EMU_BOOT_TIMEOUT:-300}"
 # After this many seconds without boot, if the guest shows no CPU progress we
 # declare virtualization unavailable rather than waiting out the full timeout.
