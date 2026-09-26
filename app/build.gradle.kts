@@ -25,8 +25,10 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            if (keystorePropertiesFile.exists()) {
+        // Only define the release key when keystore.properties is present, so
+        // clones without the key (CI, other machines) can still build release.
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
                 storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
@@ -37,7 +39,9 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Without keystore.properties the release build is left unsigned
+            // (assembleRelease still succeeds; sign it before uploading).
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
