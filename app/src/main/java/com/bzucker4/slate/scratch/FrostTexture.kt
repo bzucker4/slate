@@ -2,6 +2,7 @@ package com.bzucker4.slate.scratch
 
 import android.graphics.Bitmap
 import kotlin.math.floor
+import androidx.core.graphics.createBitmap
 
 internal object FrostTexture {
     fun create(width: Int, height: Int): Bitmap {
@@ -25,7 +26,7 @@ internal object FrostTexture {
                 pixels[i++] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
             }
         }
-        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(w, h, Bitmap.Config.ARGB_8888)
         bitmap.setHasAlpha(true)
         bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
         return bitmap
